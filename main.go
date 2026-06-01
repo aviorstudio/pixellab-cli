@@ -12,12 +12,19 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const defaultBaseURL = "https://api.pixellab.ai/v2"
+
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
 
 type RunOptions struct {
 	Env    map[string]string
@@ -32,9 +39,15 @@ type EndpointSpec struct {
 	QueryParams  []string
 }
 
+type endpointMatch struct {
+	Spec        EndpointSpec
+	RequestPath string
+}
+
 type cliConfig struct {
 	Token        string
 	BaseURL      string
+	Method       string
 	JSON         bool
 	Out          string
 	Wait         bool
@@ -87,25 +100,38 @@ func Run(ctx context.Context, args []string, opts RunOptions) int {
 		opts.Env = envMap(os.Environ())
 	}
 
-	if len(args) < 2 {
-		fmt.Fprintln(stderr, "usage: pixellab <get|post|patch|delete> <api-path> [flags]")
+	if len(args) < 1 {
+		fmt.Fprintln(stderr, "usage: pxlb <api-route> [flags]")
 		return 2
 	}
-	method := strings.ToUpper(args[0])
-	pathTemplate := args[1]
-	spec, ok := findEndpoint(method, pathTemplate)
-	if !ok {
-		fmt.Fprintf(stderr, "unknown endpoint: %s %s\n", method, pathTemplate)
-		return 2
+	if args[0] == "--version" || args[0] == "-v" || args[0] == "version" {
+		fmt.Fprintf(stdout, "pxlb %s\ncommit: %s\nbuilt: %s\n", version, commit, date)
+		return 0
 	}
+	if args[0] == "--help" || args[0] == "-h" || args[0] == "help" {
+		printHelp(stdout)
+		return 0
+	}
+	pathTemplate := normalizeRouteArg(args[0])
 
-	cfg, err := parseFlags(args[2:], opts.Env)
+	cfg, err := parseFlags(args[1:], opts.Env)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
+	match, err := resolveEndpoint(pathTemplate, cfg)
+	if err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
+	spec := match.Spec
+	method := spec.Method
+	if err := rejectPathParamFlags(spec, cfg.Flags); err != nil {
+		fmt.Fprintln(stderr, err)
+		return 2
+	}
 
-	requestPath, err := fillPathParams(pathTemplate, cfg.Flags)
+	requestPath, err := fillPathParams(match.RequestPath, cfg.Flags)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
@@ -242,6 +268,214 @@ func EndpointSpecs() []EndpointSpec {
 	}
 }
 
+func printHelp(w io.Writer) {
+	fmt.Fprintln(w, "pxlb - PixelLab v2 API CLI")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Usage:")
+	fmt.Fprintln(w, "  pxlb <api-route> [flags]")
+	fmt.Fprintln(w, "  pxlb --version")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Global flags:")
+	fmt.Fprintln(w, "  --token <key>            PixelLab API key; overrides PIXELLAB_API_KEY and .env.")
+	fmt.Fprintln(w, "  --base-url <url>         API base URL; defaults to https://api.pixellab.ai/v2.")
+	fmt.Fprintln(w, "  --http-method <method>   Override inferred HTTP method for colliding routes.")
+	fmt.Fprintln(w, "  --body-json <json|file>  Send a raw JSON request body.")
+	fmt.Fprintln(w, "  --wait                   Poll returned background jobs until completion.")
+	fmt.Fprintln(w, "  --out <path>             Save returned binary or base64 image outputs.")
+	fmt.Fprintln(w, "  --quiet                  Suppress normal JSON output.")
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "Routes:")
+
+	entries := helpEntries()
+	width := 0
+	for _, entry := range entries {
+		if len(entry.Command) > width {
+			width = len(entry.Command)
+		}
+	}
+	for _, entry := range entries {
+		fmt.Fprintf(w, "  %-*s  %s\n", width, entry.Command, entry.Description)
+	}
+}
+
+type helpEntry struct {
+	Command     string
+	Description string
+}
+
+func helpEntries() []helpEntry {
+	entries := make([]helpEntry, 0, len(EndpointSpecs()))
+	for _, spec := range EndpointSpecs() {
+		entries = append(entries, helpEntry{
+			Command:     helpCommand(spec),
+			Description: routeDescription(spec),
+		})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Command == entries[j].Command {
+			return entries[i].Description < entries[j].Description
+		}
+		return entries[i].Command < entries[j].Command
+	})
+	return entries
+}
+
+func helpCommand(spec EndpointSpec) string {
+	route := displayRoute(spec.Path)
+	if spec.Method == "DELETE" {
+		return route + " --http-method delete"
+	}
+	if spec.Path == "/tilesets" && spec.Method == "POST" {
+		return route + " --lower-description ... --upper-description ..."
+	}
+	return route
+}
+
+func displayRoute(path string) string {
+	parts := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	for i, part := range parts {
+		if isPlaceholderSegment(part) {
+			parts[i] = "<" + part[1:len(part)-1] + ">"
+		}
+	}
+	return strings.Join(parts, "/")
+}
+
+func routeDescription(spec EndpointSpec) string {
+	switch spec.Method + " " + spec.Path {
+	case "DELETE /characters/{character_id}":
+		return "Delete a character and its associated data."
+	case "DELETE /objects/{object_id}":
+		return "Delete an object and its associated rotations, animations, and tags."
+	case "GET /background-jobs/{job_id}":
+		return "Check the status and result of an asynchronous background job."
+	case "GET /balance":
+		return "Show account credits and subscription generation balance."
+	case "GET /characters":
+		return "List characters with pagination."
+	case "GET /characters/{character_id}":
+		return "Show character details, rotations, animations, and download links."
+	case "GET /characters/{character_id}/zip":
+		return "Download a character ZIP archive."
+	case "GET /isometric-tiles":
+		return "List generated isometric tiles."
+	case "GET /isometric-tiles/{tile_id}":
+		return "Show an isometric tile or its generation status."
+	case "GET /llms.txt":
+		return "Print PixelLab's LLM-oriented API documentation."
+	case "GET /objects":
+		return "List objects with pagination."
+	case "GET /objects/{object_id}":
+		return "Show object details, rotations, animations, and download links."
+	case "GET /tiles-pro/{tile_id}":
+		return "Show generated pro tile data and storage URLs."
+	case "GET /tilesets":
+		return "List generated top-down tilesets."
+	case "GET /tilesets/{tileset_id}":
+		return "Show a tileset, download links, and generation status."
+	case "PATCH /characters/{character_id}/tags":
+		return "Replace a character's tags."
+	case "PATCH /objects/{object_id}/tags":
+		return "Replace an object's tags."
+	case "POST /animate-character":
+		return "Queue a character animation from a template or text description."
+	case "POST /animate-with-skeleton":
+		return "Generate animation frames from a reference image and skeleton keypoints."
+	case "POST /animate-with-text":
+		return "Generate legacy text-guided animation frames from a reference image."
+	case "POST /animate-with-text-v2":
+		return "Queue pro text-guided animation from a reference image."
+	case "POST /animate-with-text-v3":
+		return "Generate v3 text-guided animation from first and optional last frames."
+	case "POST /characters/animations":
+		return "Queue a character animation using the character animation API."
+	case "POST /create-1-direction-object":
+		return "Create one-direction pixel art objects, optionally as review candidates."
+	case "POST /create-8-direction-object":
+		return "Create an object rendered from eight directions."
+	case "POST /create-character-pro":
+		return "Create a pro-mode character."
+	case "POST /create-character-state":
+		return "Create an edited state of an existing character."
+	case "POST /create-character-v3":
+		return "Create a v3 character."
+	case "POST /create-character-with-4-directions":
+		return "Create a four-direction character."
+	case "POST /create-character-with-8-directions":
+		return "Create an eight-direction character."
+	case "POST /create-image-bitforge":
+		return "Create pixel art with the Bitforge image model."
+	case "POST /create-image-pixen":
+		return "Create pixel art with the Pixen image model."
+	case "POST /create-image-pixflux":
+		return "Create pixel art with the Pixflux image model."
+	case "POST /create-isometric-tile":
+		return "Create an isometric pixel art tile."
+	case "POST /create-tiles-pro":
+		return "Create multiple pro tile variations."
+	case "POST /create-tileset":
+		return "Create a top-down Wang tileset with terrain transitions."
+	case "POST /create-tileset-sidescroller":
+		return "Create a sidescroller platformer tileset."
+	case "POST /edit-animation-v2":
+		return "Edit existing animation frames with a text instruction."
+	case "POST /edit-image":
+		return "Edit a single image with text guidance."
+	case "POST /edit-images-v2":
+		return "Edit multiple images with text guidance."
+	case "POST /enhance-animation-v3-prompt":
+		return "Enhance an animation action prompt for v3 generation."
+	case "POST /enhance-character-v3-prompt":
+		return "Enhance a character creation prompt."
+	case "POST /enhance-pixen-prompt":
+		return "Enhance an image generation prompt."
+	case "POST /estimate-skeleton":
+		return "Estimate skeleton keypoints from an image."
+	case "POST /generate-8-rotations-v2":
+		return "Queue pro generation of eight rotations for an image."
+	case "POST /generate-8-rotations-v3":
+		return "Generate eight rotations from a first frame."
+	case "POST /generate-image-v2":
+		return "Queue pro image generation."
+	case "POST /generate-ui-v2":
+		return "Queue UI asset generation."
+	case "POST /generate-with-style-v2":
+		return "Queue image generation matching style reference images."
+	case "POST /image-to-pixelart":
+		return "Convert an image to pixel art."
+	case "POST /inpaint":
+		return "Inpaint an image region using a mask."
+	case "POST /inpaint-v3":
+		return "Inpaint an image region with the v3 inpainting model."
+	case "POST /interpolation-v2":
+		return "Interpolate animation frames between start and end images."
+	case "POST /map-objects":
+		return "Create a map object, optionally style-matched to a background."
+	case "POST /objects/{object_id}/animations":
+		return "Queue an animation for an existing object."
+	case "POST /objects/{object_id}/dismiss-review":
+		return "Discard all review candidates for an object."
+	case "POST /objects/{object_id}/select-frames":
+		return "Promote selected review candidates into completed objects."
+	case "POST /objects/{object_id}/states":
+		return "Create an edited state of an existing object."
+	case "POST /remove-background":
+		return "Remove the background from an image."
+	case "POST /resize":
+		return "Resize and regenerate an image to a target size."
+	case "POST /rotate":
+		return "Rotate an image from one direction to another."
+	case "POST /tilesets":
+		return "Create a top-down Wang tileset with terrain transitions."
+	case "POST /tilesets-sidescroller":
+		return "Create a sidescroller platformer tileset."
+	case "POST /transfer-outfit-v2":
+		return "Transfer outfit or appearance from a reference onto frames."
+	default:
+		return "Call this PixelLab API route."
+	}
+}
+
 func findEndpoint(method, path string) (EndpointSpec, bool) {
 	for _, spec := range EndpointSpecs() {
 		if spec.Method == method && spec.Path == path {
@@ -249,6 +483,144 @@ func findEndpoint(method, path string) (EndpointSpec, bool) {
 		}
 	}
 	return EndpointSpec{}, false
+}
+
+func normalizeRouteArg(route string) string {
+	if strings.HasPrefix(route, "/") {
+		return route
+	}
+	return "/" + route
+}
+
+func resolveEndpoint(path string, cfg cliConfig) (endpointMatch, error) {
+	matches := endpointsForPath(path)
+	if cfg.Method != "" {
+		for _, match := range matches {
+			if match.Spec.Method == cfg.Method {
+				return match, nil
+			}
+		}
+		if len(matches) == 0 {
+			return endpointMatch{}, fmt.Errorf("unknown endpoint: %s", path)
+		}
+		return endpointMatch{}, fmt.Errorf("endpoint %s does not support --http-method %s; available methods: %s", path, strings.ToLower(cfg.Method), availableMethods(matches))
+	}
+	if len(matches) == 0 {
+		return endpointMatch{}, fmt.Errorf("unknown endpoint: %s", path)
+	}
+	if len(matches) == 1 {
+		return matches[0], nil
+	}
+	if bodyInputPresent(cfg, matches) {
+		var bodyMatches []endpointMatch
+		for _, match := range matches {
+			if match.Spec.Method != "GET" && match.Spec.Method != "DELETE" {
+				bodyMatches = append(bodyMatches, match)
+			}
+		}
+		if len(bodyMatches) == 1 {
+			return bodyMatches[0], nil
+		}
+	}
+	for _, match := range matches {
+		if match.Spec.Method == "GET" {
+			return match, nil
+		}
+	}
+	return endpointMatch{}, fmt.Errorf("ambiguous endpoint: %s; use --http-method with one of: %s", path, availableMethods(matches))
+}
+
+func endpointsForPath(path string) []endpointMatch {
+	var matches []endpointMatch
+	for _, spec := range EndpointSpecs() {
+		requestPath, ok := matchEndpointPath(spec.Path, path)
+		if ok {
+			matches = append(matches, endpointMatch{Spec: spec, RequestPath: requestPath})
+		}
+	}
+	return matches
+}
+
+func matchEndpointPath(template string, path string) (string, bool) {
+	templateParts := strings.Split(strings.Trim(template, "/"), "/")
+	pathParts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(templateParts) != len(pathParts) {
+		return "", false
+	}
+	requestParts := make([]string, len(pathParts))
+	for i := range templateParts {
+		if isUserPlaceholderSegment(pathParts[i]) {
+			return "", false
+		}
+		if isPlaceholderSegment(templateParts[i]) {
+			if pathParts[i] == "" {
+				return "", false
+			}
+			requestParts[i] = url.PathEscape(pathParts[i])
+			continue
+		}
+		if templateParts[i] != pathParts[i] {
+			return "", false
+		}
+		requestParts[i] = templateParts[i]
+	}
+	return "/" + strings.Join(requestParts, "/"), true
+}
+
+func isPlaceholderSegment(segment string) bool {
+	return strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") && len(segment) > 2
+}
+
+func isUserPlaceholderSegment(segment string) bool {
+	return isPlaceholderSegment(segment) || (strings.HasPrefix(segment, "<") && strings.HasSuffix(segment, ">") && len(segment) > 2)
+}
+
+func bodyInputPresent(cfg cliConfig, matches []endpointMatch) bool {
+	if cfg.BodyJSON != "" {
+		return true
+	}
+	queryNames := map[string]bool{}
+	for _, match := range matches {
+		for _, name := range match.Spec.QueryParams {
+			queryNames[snakeToKebab(name)] = true
+		}
+	}
+	for flagName := range cfg.Flags {
+		if queryNames[flagName] {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func availableMethods(matches []endpointMatch) string {
+	methods := make([]string, 0, len(matches))
+	for _, match := range matches {
+		methods = append(methods, strings.ToLower(match.Spec.Method))
+	}
+	return strings.Join(methods, ", ")
+}
+
+func rejectPathParamFlags(spec EndpointSpec, flags map[string][]string) error {
+	for _, name := range pathParamNames(spec.Path) {
+		flagName := snakeToKebab(name)
+		if len(flags[flagName]) > 0 {
+			return fmt.Errorf("route parameter %s belongs in the route, for example: %s", flagName, displayRoute(spec.Path))
+		}
+	}
+	return nil
+}
+
+func pathParamNames(path string) []string {
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	names := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if isPlaceholderSegment(part) {
+			names = append(names, part[1:len(part)-1])
+		}
+	}
+	return names
 }
 
 func parseFlags(args []string, env map[string]string) (cliConfig, error) {
@@ -274,6 +646,14 @@ func parseFlags(args []string, env map[string]string) (cliConfig, error) {
 			cfg.Token = value
 		case "base-url":
 			cfg.BaseURL = value
+		case "http-method":
+			method := strings.ToUpper(value)
+			switch method {
+			case "GET", "POST", "PATCH", "DELETE":
+				cfg.Method = method
+			default:
+				return cfg, fmt.Errorf("invalid --http-method: %s", value)
+			}
 		case "json":
 			cfg.JSON = parseBool(value)
 		case "out":

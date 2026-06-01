@@ -1,2 +1,4 @@
 .playwright-cli
 tmp
+/bin
+/dist

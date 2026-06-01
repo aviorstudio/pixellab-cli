@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+concurrency: release-${{ github.repository }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Determine release version
+        id: release
+        env:
+          BUMP: ${{ inputs.bump }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo 'Run releases from the main branch.' >&2
+            exit 1
+          fi
+          git fetch --tags --force
+          latest="$(git tag --list 'v[0-9]*' | sed -E 's/^v//' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)"
+          if [ -z "$latest" ]; then
+            VERSION="0.0.1"
+          else
+            IFS=. read -r major minor patch <<< "$latest"
+            case "$BUMP" in
+              major) major=$((major + 1)); minor=0; patch=0 ;;
+              minor) minor=$((minor + 1)); patch=0 ;;
+              patch) patch=$((patch + 1)) ;;
+              *) echo "Unsupported bump: $BUMP" >&2; exit 1 ;;
+            esac
+            VERSION="${major}.${minor}.${patch}"
+          fi
+          TAG="v${VERSION}"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "Tag already exists: $TAG" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Test CLI
+        run: go test ./...
+
+      - name: Build release artifacts
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p dist
+
+          build() {
+            goos="$1"
+            goarch="$2"
+            os_label="$3"
+            arch_label="$4"
+            archive_ext="$5"
+            exe=""
+            if [ "$goos" = "windows" ]; then
+              exe=".exe"
+            fi
+
+            name="pxlb_${os_label}_${arch_label}"
+            out_dir="dist/$name"
+            mkdir -p "$out_dir"
+            out_path="$PWD/$out_dir/pxlb$exe"
+            GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build \
+              -ldflags "-s -w -X main.version=$VERSION -X main.commit=$COMMIT -X main.date=$DATE" \
+              -o "$out_path" .
+            cp README.md "$out_dir/README.md"
+
+            if [ "$archive_ext" = "zip" ]; then
+              (cd "$out_dir" && zip -q "../$name.zip" "pxlb$exe" README.md)
+            else
+              tar -C "$out_dir" -czf "dist/$name.tar.gz" "pxlb$exe" README.md
+            fi
+          }
+
+          build linux amd64 Linux x86_64 tar.gz
+          build linux arm64 Linux arm64 tar.gz
+          build darwin amd64 Darwin x86_64 tar.gz
+          build darwin arm64 Darwin arm64 tar.gz
+          build windows amd64 Windows x86_64 zip
+          build windows arm64 Windows arm64 zip
+
+          (cd dist && sha256sum *.tar.gz *.zip > checksums.txt)
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" dist/*.tar.gz dist/*.zip dist/checksums.txt --target "$GITHUB_SHA" --title "$TAG" --notes "Release $TAG"

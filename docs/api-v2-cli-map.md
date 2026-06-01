@@ -12,21 +12,24 @@ Observed API surface: `61` unique paths, `64` HTTP operations, and `195` schemas
 
 ## Command Model
 
-Expose endpoints directly by HTTP method and API path:
+Expose endpoints directly by API route without a leading slash. The CLI infers the HTTP method from the route and request flags.
 
 ```bash
-pixellab get /balance
-pixellab post /create-image-pixen --description "cute dragon" --image-size 128x128
-pixellab get /objects/{object_id} --object-id <uuid>
-pixellab delete /objects/{object_id} --object-id <uuid>
+pxlb balance
+pxlb create-image-pixen --description "cute dragon" --image-size 128x128
+pxlb objects/<object_id>
+pxlb objects/<object_id> --http-method delete
 ```
 
 Rules:
 
-- First positional arg is the HTTP method: `get`, `post`, `patch`, or `delete`.
-- Second positional arg is the exact API path from docs.
-- Path parameters may be supplied with named flags, such as `--object-id`, `--character-id`, `--job-id`, `--tileset-id`, or `--tile-id`.
-- The CLI should replace `{param}` placeholders before sending the request.
+- First positional arg is the API route from docs without the leading slash.
+- Unique routes infer their only supported HTTP method.
+- Routes with both `GET` and `DELETE` default to safe `GET`; use `--http-method delete` to delete.
+- Routes with both `GET` and `POST`, such as `/tilesets`, infer `POST` when request-body flags or `--body-json` are present and `GET` otherwise.
+- Use `--http-method <get|post|patch|delete>` only when inference is not enough or when explicitly selecting a destructive method.
+- Path parameters are written directly in the route, such as `objects/<object_id>` or `background-jobs/<job_id>`.
+- Do not pass route IDs again as flags. Flags such as `--character-id` are only used for request body fields on routes like `animate-character`.
 - All request body fields should be available as flags using kebab-case names matching snake_case JSON fields.
 - All endpoints should also support `--body-json <path-or-json>` as an escape hatch for full raw request bodies.
 - All commands should support `--json` to print raw API responses.
@@ -37,6 +40,7 @@ Rules:
 |---|---:|---|
 | `--token` | `PIXELLAB_API_KEY` | Bearer token/API key. |
 | `--base-url` | `https://api.pixellab.ai/v2` | API base URL. |
+| `--http-method` | inferred | Override inferred HTTP method for colliding routes. |
 | `--json` | `false` | Print raw JSON response. |
 | `--out` | empty | Output file or directory for returned images, ZIPs, or downloaded assets. |
 | `--wait` | `false` | Poll async jobs until completed when a job id is returned. |
@@ -87,9 +91,9 @@ Async response status codes include `202` for most pro/background endpoints and 
 Common async workflow:
 
 ```bash
-pixellab post /generate-image-v2 --description "crystal sword" --image-size 128x128
-pixellab get /background-jobs/{job_id} --job-id <uuid>
-pixellab post /generate-image-v2 --description "crystal sword" --image-size 128x128 --wait --out ./out
+pxlb generate-image-v2 --description "crystal sword" --image-size 128x128
+pxlb background-jobs/<job_id>
+pxlb generate-image-v2 --description "crystal sword" --image-size 128x128 --wait --out ./out
 ```
 
 The `--wait` implementation should:
@@ -149,7 +153,7 @@ Common object shapes:
 Command:
 
 ```bash
-pixellab get /balance
+pxlb balance
 ```
 
 Args: none.
@@ -163,14 +167,10 @@ Responses: `200`, `401`.
 Command:
 
 ```bash
-pixellab get /background-jobs/{job_id} --job-id <uuid>
+pxlb background-jobs/<job_id>
 ```
 
-Args:
-
-| Arg | Required | Type | Notes |
-|---|---:|---|---|
-| `--job-id` | yes | string | Path parameter. |
+Args: none; put the job id in the route.
 
 Responses: `200`, `401`, `404`, `422`, `429`.
 
@@ -181,7 +181,7 @@ Responses: `200`, `401`, `404`, `422`, `429`.
 Command:
 
 ```bash
-pixellab get /llms.txt
+pxlb llms.txt
 ```
 
 Args: none.
@@ -197,7 +197,7 @@ Generate image Pro. Async.
 Command:
 
 ```bash
-pixellab post /generate-image-v2 --description "..." --image-size 128x128
+pxlb generate-image-v2 --description "..." --image-size 128x128
 ```
 
 Args:
@@ -221,7 +221,7 @@ Generate with style Pro. Async.
 Command:
 
 ```bash
-pixellab post /generate-with-style-v2 --style-image a.png --description "..." --image-size 128x128
+pxlb generate-with-style-v2 --style-image a.png --description "..." --image-size 128x128
 ```
 
 Args:
@@ -244,7 +244,7 @@ Generate UI Pro. Async.
 Command:
 
 ```bash
-pixellab post /generate-ui-v2 --description "medieval stone button" --image-size 128x64
+pxlb generate-ui-v2 --description "medieval stone button" --image-size 128x64
 ```
 
 Args:
@@ -265,7 +265,7 @@ Responses: `202`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-image-pixflux --description "cute dragon" --image-size 128x128
+pxlb create-image-pixflux --description "cute dragon" --image-size 128x128
 ```
 
 Args:
@@ -296,7 +296,7 @@ Responses: `200`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab post /create-image-pixen --description "cute dragon" --image-size 128x128
+pxlb create-image-pixen --description "cute dragon" --image-size 128x128
 ```
 
 Args:
@@ -321,7 +321,7 @@ Responses: `200`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab post /create-image-bitforge --description "cute dragon" --image-size 128x128
+pxlb create-image-bitforge --description "cute dragon" --image-size 128x128
 ```
 
 Args:
@@ -362,7 +362,7 @@ Responses: `200`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab post /image-to-pixelart --image input.png --image-size 512x512 --output-size 128x128
+pxlb image-to-pixelart --image input.png --image-size 512x512 --output-size 128x128
 ```
 
 Args:
@@ -382,7 +382,7 @@ Responses: `200`, `400`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /resize --description "wizard" --reference-image input.png --reference-image-size 64x64 --target-size 128x128
+pxlb resize --description "wizard" --reference-image input.png --reference-image-size 64x64 --target-size 128x128
 ```
 
 Args:
@@ -410,7 +410,7 @@ Responses: `200`, `400`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /remove-background --image input.png --image-size 128x128
+pxlb remove-background --image input.png --image-size 128x128
 ```
 
 Args:
@@ -434,7 +434,7 @@ Edit animation Pro. Async.
 Command:
 
 ```bash
-pixellab post /edit-animation-v2 --description "add a glowing sword" --frames-json frames.json --image-size 64x64
+pxlb edit-animation-v2 --description "add a glowing sword" --frames-json frames.json --image-size 64x64
 ```
 
 Args:
@@ -456,7 +456,7 @@ Interpolate Pro. Async.
 Command:
 
 ```bash
-pixellab post /interpolation-v2 --start-image start.png --start-size 64x64 --end-image end.png --end-size 64x64 --action "sword slash" --image-size 64x64
+pxlb interpolation-v2 --start-image start.png --start-size 64x64 --end-image end.png --end-size 64x64 --action "sword slash" --image-size 64x64
 ```
 
 Args:
@@ -481,7 +481,7 @@ Transfer outfit Pro. Async.
 Command:
 
 ```bash
-pixellab post /transfer-outfit-v2 --reference-image outfit.png --reference-size 64x64 --frames-json frames.json --image-size 64x64
+pxlb transfer-outfit-v2 --reference-image outfit.png --reference-size 64x64 --frames-json frames.json --image-size 64x64
 ```
 
 Args:
@@ -503,7 +503,7 @@ Responses: `202`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /animate-with-skeleton --reference-image sprite.png --image-size 64x64 --skeleton-keypoints-json poses.json
+pxlb animate-with-skeleton --reference-image sprite.png --image-size 64x64 --skeleton-keypoints-json poses.json
 ```
 
 Args:
@@ -532,7 +532,7 @@ Responses: `200`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab post /animate-with-text --description "wizard" --action "walking" --reference-image sprite.png --image-size 64x64
+pxlb animate-with-text --description "wizard" --action "walking" --reference-image sprite.png --image-size 64x64
 ```
 
 Args:
@@ -566,7 +566,7 @@ Animate with text Pro. Async.
 Command:
 
 ```bash
-pixellab post /animate-with-text-v2 --reference-image sprite.png --reference-image-size 64x64 --action "walking" --image-size 64x64
+pxlb animate-with-text-v2 --reference-image sprite.png --reference-image-size 64x64 --action "walking" --image-size 64x64
 ```
 
 Args:
@@ -589,7 +589,7 @@ Responses: `202`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /animate-with-text-v3 --first-frame idle.png --action "walking" --frame-count 8
+pxlb animate-with-text-v3 --first-frame idle.png --action "walking" --frame-count 8
 ```
 
 Args:
@@ -611,7 +611,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /estimate-skeleton --image sprite.png
+pxlb estimate-skeleton --image sprite.png
 ```
 
 Args:
@@ -631,7 +631,7 @@ Generate 8 rotations Pro. Async.
 Command:
 
 ```bash
-pixellab post /generate-8-rotations-v2 --image-size 128x128 --reference-image sprite.png
+pxlb generate-8-rotations-v2 --image-size 128x128 --reference-image sprite.png
 ```
 
 Args:
@@ -655,7 +655,7 @@ Responses: `202`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /generate-8-rotations-v3 --first-frame south.png
+pxlb generate-8-rotations-v3 --first-frame south.png
 ```
 
 Args:
@@ -673,7 +673,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /rotate --from-image sprite.png --image-size 128x128 --from-direction south --to-direction east
+pxlb rotate --from-image sprite.png --image-size 128x128 --from-direction south --to-direction east
 ```
 
 Args:
@@ -708,7 +708,7 @@ Inpaint image Pro. Async.
 Command:
 
 ```bash
-pixellab post /inpaint-v3 --description "golden crown" --inpainting-image image.png --inpainting-size 128x128 --mask-image mask.png --mask-size 128x128
+pxlb inpaint-v3 --description "golden crown" --inpainting-image image.png --inpainting-size 128x128 --mask-image mask.png --mask-size 128x128
 ```
 
 Args:
@@ -734,7 +734,7 @@ Responses: `202`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /inpaint --description "golden crown" --image-size 128x128 --inpainting-image image.png --mask-image mask.png
+pxlb inpaint --description "golden crown" --image-size 128x128 --inpainting-image image.png --mask-image mask.png
 ```
 
 Args:
@@ -772,7 +772,7 @@ Edit images Pro. Async.
 Command:
 
 ```bash
-pixellab post /edit-images-v2 --edit-images-json images.json --image-size 128x128 --description "make it icy"
+pxlb edit-images-v2 --edit-images-json images.json --image-size 128x128 --description "make it icy"
 ```
 
 Args:
@@ -797,7 +797,7 @@ Edit image. Async.
 Command:
 
 ```bash
-pixellab post /edit-image --image input.png --image-size 128x128 --description "make it golden" --width 128 --height 128
+pxlb edit-image --image input.png --image-size 128x128 --description "make it golden" --width 128 --height 128
 ```
 
 Args:
@@ -825,7 +825,7 @@ Create top-down Wang tileset asynchronously.
 Command:
 
 ```bash
-pixellab post /tilesets --lower-description "ocean" --upper-description "beach"
+pxlb tilesets --lower-description "ocean" --upper-description "beach"
 ```
 
 Args: same as `POST /create-tileset`.
@@ -837,7 +837,7 @@ Responses: `202`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab get /tilesets --limit 50 --offset 0
+pxlb tilesets --limit 50 --offset 0
 ```
 
 Args:
@@ -854,7 +854,7 @@ Responses: `200`, `401`, `422`.
 Command:
 
 ```bash
-pixellab post /create-tileset --lower-description "ocean" --upper-description "beach"
+pxlb create-tileset --lower-description "ocean" --upper-description "beach"
 ```
 
 Args:
@@ -889,14 +889,10 @@ Responses: `200`, `202`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab get /tilesets/{tileset_id} --tileset-id <uuid>
+pxlb tilesets/<tileset_id>
 ```
 
-Args:
-
-| Arg | Required | Type | Notes |
-|---|---:|---|---|
-| `--tileset-id` | yes | string | Path parameter. |
+Args: none; put the tileset id in the route.
 
 Responses: `200`, `401`, `404`, `422`, `423`.
 
@@ -907,7 +903,7 @@ Create sidescroller tileset asynchronously.
 Command:
 
 ```bash
-pixellab post /tilesets-sidescroller --lower-description "stone bricks" --transition-description "moss"
+pxlb tilesets-sidescroller --lower-description "stone bricks" --transition-description "moss"
 ```
 
 Args: same as `POST /create-tileset-sidescroller`.
@@ -919,7 +915,7 @@ Responses: `202`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab post /create-tileset-sidescroller --lower-description "stone bricks" --transition-description "moss"
+pxlb create-tileset-sidescroller --lower-description "stone bricks" --transition-description "moss"
 ```
 
 Args:
@@ -950,7 +946,7 @@ Responses: `202`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab post /create-isometric-tile --description "grass on dirt" --image-size 32x32
+pxlb create-isometric-tile --description "grass on dirt" --image-size 32x32
 ```
 
 Args:
@@ -977,10 +973,10 @@ Responses: `200`, `202`, `401`, `402`, `422`, `429`, `529`.
 Command:
 
 ```bash
-pixellab get /isometric-tiles/{tile_id} --tile-id <uuid>
+pxlb isometric-tiles/<tile_id>
 ```
 
-Args: `--tile-id` required.
+Args: none; put the tile id in the route.
 
 Responses: `200`, `401`, `404`, `422`, `423`.
 
@@ -989,7 +985,7 @@ Responses: `200`, `401`, `404`, `422`, `423`.
 Command:
 
 ```bash
-pixellab get /isometric-tiles --limit 50 --offset 0
+pxlb isometric-tiles --limit 50 --offset 0
 ```
 
 Args: `--limit`, `--offset`.
@@ -1001,7 +997,7 @@ Responses: `200`, `401`, `422`.
 Command:
 
 ```bash
-pixellab post /create-tiles-pro --description "1). grass 2). stone" --tile-type isometric --tile-size 32
+pxlb create-tiles-pro --description "1). grass 2). stone" --tile-type isometric --tile-size 32
 ```
 
 Args:
@@ -1026,10 +1022,10 @@ Responses: `202`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab get /tiles-pro/{tile_id} --tile-id <uuid>
+pxlb tiles-pro/<tile_id>
 ```
 
-Args: `--tile-id` required.
+Args: none; put the tile id in the route.
 
 Responses: `200`, `401`, `404`, `422`, `423`.
 
@@ -1040,7 +1036,7 @@ Responses: `200`, `401`, `404`, `422`, `423`.
 Command:
 
 ```bash
-pixellab post /map-objects --description "wooden barrel" --image-size 128x128
+pxlb map-objects --description "wooden barrel" --image-size 128x128
 ```
 
 Args:
@@ -1070,7 +1066,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-character-with-4-directions --description "blue wizard" --image-size 64x64
+pxlb create-character-with-4-directions --description "blue wizard" --image-size 64x64
 ```
 
 Args:
@@ -1101,7 +1097,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-character-with-8-directions --description "blue wizard" --image-size 64x64
+pxlb create-character-with-8-directions --description "blue wizard" --image-size 64x64
 ```
 
 Args: same as 4-direction character plus `--mode` default `standard`.
@@ -1113,7 +1109,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-character-pro --description "blue wizard" --image-size 96x96
+pxlb create-character-pro --description "blue wizard" --image-size 96x96
 ```
 
 Args:
@@ -1138,7 +1134,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-character-v3 --description "blue wizard" --image-size 64x64 --enhance-prompt
+pxlb create-character-v3 --description "blue wizard" --image-size 64x64 --enhance-prompt
 ```
 
 Args:
@@ -1164,7 +1160,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /characters/animations --character-id <uuid> --action-description "walking"
+pxlb characters/animations --character-id <uuid> --action-description "walking"
 ```
 
 Args: same as `POST /animate-character`.
@@ -1176,7 +1172,7 @@ Responses: `200`, `422`.
 Command:
 
 ```bash
-pixellab post /animate-character --character-id <uuid> --mode v3 --action-description "walking" --frame-count 8
+pxlb animate-character --character-id <uuid> --mode v3 --action-description "walking" --frame-count 8
 ```
 
 Args:
@@ -1211,7 +1207,7 @@ Responses: `200`, `401`, `402`, `404`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-character-state --character-id <uuid> --edit-description "wearing red armor"
+pxlb create-character-state --character-id <uuid> --edit-description "wearing red armor"
 ```
 
 Args:
@@ -1233,7 +1229,7 @@ Responses: `200`, `400`, `401`, `402`, `404`, `422`, `429`.
 Command:
 
 ```bash
-pixellab get /characters --limit 50 --offset 0
+pxlb characters --limit 50 --offset 0
 ```
 
 Args: `--limit`, `--offset`.
@@ -1245,10 +1241,10 @@ Responses: `200`, `401`, `422`, `429`.
 Command:
 
 ```bash
-pixellab get /characters/{character_id} --character-id <uuid>
+pxlb characters/<character_id>
 ```
 
-Args: `--character-id` required.
+Args: none; put the character id in the route.
 
 Responses: `200`, `401`, `403`, `404`, `422`, `429`.
 
@@ -1257,10 +1253,10 @@ Responses: `200`, `401`, `403`, `404`, `422`, `429`.
 Command:
 
 ```bash
-pixellab delete /characters/{character_id} --character-id <uuid>
+pxlb characters/<character_id> --http-method delete
 ```
 
-Args: `--character-id` required.
+Args: none; put the character id in the route.
 
 Responses: `200`, `422`.
 
@@ -1269,10 +1265,10 @@ Responses: `200`, `422`.
 Command:
 
 ```bash
-pixellab get /characters/{character_id}/zip --character-id <uuid> --out character.zip
+pxlb characters/<character_id>/zip --out character.zip
 ```
 
-Args: `--character-id` required, `--out` recommended.
+Args: put the character id in the route; `--out` recommended.
 
 Responses: `200`, `404`, `422`, `423`.
 
@@ -1281,14 +1277,13 @@ Responses: `200`, `404`, `422`, `423`.
 Command:
 
 ```bash
-pixellab patch /characters/{character_id}/tags --character-id <uuid> --tag wizard --tag fire
+pxlb characters/<character_id>/tags --tag wizard --tag fire
 ```
 
 Args:
 
 | Arg | Required | Type | Notes |
 |---|---:|---|---|
-| `--character-id` | yes | string | Path parameter. |
 | `--tag` | yes | repeatable string | Up to 20 tags. |
 
 Responses: `200`, `400`, `401`, `403`, `404`, `422`, `429`.
@@ -1300,7 +1295,7 @@ Responses: `200`, `400`, `401`, `403`, `404`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-1-direction-object --description "wooden barrel" --size 128 --view sidescroller
+pxlb create-1-direction-object --description "wooden barrel" --size 128 --view sidescroller
 ```
 
 Args:
@@ -1320,7 +1315,7 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /create-8-direction-object --description "stone fountain" --size 128 --view "low top-down"
+pxlb create-8-direction-object --description "stone fountain" --size 128 --view "low top-down"
 ```
 
 Args:
@@ -1340,14 +1335,13 @@ Responses: `200`, `401`, `402`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /objects/{object_id}/animations --object-id <uuid> --animation-description "walking" --display-name walk --frame-count 8
+pxlb objects/<object_id>/animations --animation-description "walking" --display-name walk --frame-count 8
 ```
 
 Args:
 
 | Arg | Required | Type | Notes |
 |---|---:|---|---|
-| `--object-id` | yes | string | Path parameter. |
 | `--mode` | no | enum | `pro`, `v3`; default `v3`. |
 | `--animation-description` | no | string | Required for new animations. |
 | `--directions` | no | CSV | Do not pass for 1-direction objects. |
@@ -1366,14 +1360,13 @@ Responses: `200`, `400`, `401`, `402`, `404`, `409`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /objects/{object_id}/states --object-id <uuid> --edit-description "make it golden"
+pxlb objects/<object_id>/states --edit-description "make it golden"
 ```
 
 Args:
 
 | Arg | Required | Type | Notes |
 |---|---:|---|---|
-| `--object-id` | yes | string | Path parameter. |
 | `--edit-description` | yes | string | 1-1000 chars. |
 | `--seed` | no | integer | Reproducible generation. |
 
@@ -1384,14 +1377,13 @@ Responses: `200`, `400`, `401`, `402`, `404`, `422`, `429`.
 Command:
 
 ```bash
-pixellab post /objects/{object_id}/select-frames --object-id <uuid> --index 0 --index 3 --common-tag props
+pxlb objects/<object_id>/select-frames --index 0 --index 3 --common-tag props
 ```
 
 Args:
 
 | Arg | Required | Type | Notes |
 |---|---:|---|---|
-| `--object-id` | yes | string | Path parameter. |
 | `--index` | yes | repeatable integer | 0-based frame index. |
 | `--common-tag` | no | string | Applied to created objects. |
 
@@ -1402,10 +1394,10 @@ Responses: `200`, `400`, `401`, `404`, `422`.
 Command:
 
 ```bash
-pixellab post /objects/{object_id}/dismiss-review --object-id <uuid>
+pxlb objects/<object_id>/dismiss-review
 ```
 
-Args: `--object-id` required.
+Args: none; put the object id in the route.
 
 Responses: `200`, `400`, `401`, `404`, `422`.
 
@@ -1416,7 +1408,7 @@ Responses: `200`, `400`, `401`, `404`, `422`.
 Command:
 
 ```bash
-pixellab get /objects --limit 50 --offset 0
+pxlb objects --limit 50 --offset 0
 ```
 
 Args: `--limit`, `--offset`.
@@ -1428,10 +1420,10 @@ Responses: `200`, `401`, `422`.
 Command:
 
 ```bash
-pixellab get /objects/{object_id} --object-id <uuid>
+pxlb objects/<object_id>
 ```
 
-Args: `--object-id` required.
+Args: none; put the object id in the route.
 
 Responses: `200`, `401`, `403`, `404`, `422`.
 
@@ -1440,10 +1432,10 @@ Responses: `200`, `401`, `403`, `404`, `422`.
 Command:
 
 ```bash
-pixellab delete /objects/{object_id} --object-id <uuid>
+pxlb objects/<object_id> --http-method delete
 ```
 
-Args: `--object-id` required.
+Args: none; put the object id in the route.
 
 Responses: `200`, `401`, `403`, `404`, `422`.
 
@@ -1452,14 +1444,13 @@ Responses: `200`, `401`, `403`, `404`, `422`.
 Command:
 
 ```bash
-pixellab patch /objects/{object_id}/tags --object-id <uuid> --tag barrel --tag prop
+pxlb objects/<object_id>/tags --tag barrel --tag prop
 ```
 
 Args:
 
 | Arg | Required | Type | Notes |
 |---|---:|---|---|
-| `--object-id` | yes | string | Path parameter. |
 | `--tag` | yes | repeatable string | Up to 20 tags. |
 
 Responses: `200`, `400`, `401`, `403`, `404`, `422`.
@@ -1471,7 +1462,7 @@ Responses: `200`, `400`, `401`, `403`, `404`, `422`.
 Command:
 
 ```bash
-pixellab post /enhance-pixen-prompt --description "dragon" --image-size 128x128
+pxlb enhance-pixen-prompt --description "dragon" --image-size 128x128
 ```
 
 Args:
@@ -1493,7 +1484,7 @@ Responses: `200`, `401`, `402`, `422`.
 Command:
 
 ```bash
-pixellab post /enhance-character-v3-prompt --description "blue wizard" --image-size 64x64
+pxlb enhance-character-v3-prompt --description "blue wizard" --image-size 64x64
 ```
 
 Args:
@@ -1513,7 +1504,7 @@ Responses: `200`, `401`, `402`, `422`.
 Command:
 
 ```bash
-pixellab post /enhance-animation-v3-prompt --first-frame idle.png --action "walking"
+pxlb enhance-animation-v3-prompt --first-frame idle.png --action "walking"
 ```
 
 Args:
@@ -1541,8 +1532,7 @@ Recommended combat workflow:
 Object animation example:
 
 ```bash
-pixellab post /objects/{object_id}/animations \
-  --object-id <uuid> \
+pxlb objects/<object_id>/animations \
   --animation-description "aggressive sword attack: deep wind-up, heavy forward slash, strong follow-through, recover to idle; feet stay planted; big readable weapon motion; no walking, no jumping, no camera movement, no new objects, no background" \
   --display-name sword_attack \
   --frame-count 16 \
@@ -1554,7 +1544,7 @@ pixellab post /objects/{object_id}/animations \
 Standalone v3 example:
 
 ```bash
-pixellab post /animate-with-text-v3 \
+pxlb animate-with-text-v3 \
   --first-frame idle.png \
   --last-frame slash_pose.png \
   --action "heavy sword slash with planted feet, clear wind-up, strike, follow-through, and recovery" \
@@ -1581,4 +1571,4 @@ Avoid relying on `--enhance-prompt` for precise combat intent until the enhanced
 
 ## Implementation Priority
 
-Support every endpoint from the start through the generic method/path dispatcher. Typed convenience parsing should still cover the documented flags above, with `--body-json` as the compatibility fallback for complex or uncommon request shapes.
+Support every endpoint from the start through the generic path dispatcher. Typed convenience parsing should still cover the documented flags above, with `--body-json` as the compatibility fallback for complex or uncommon request shapes.
