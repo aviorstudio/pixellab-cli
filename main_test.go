@@ -144,6 +144,48 @@ func TestEndpointRegistryCoversEveryOpenAPIOperation(t *testing.T) {
 	}
 }
 
+func TestVersionCommandPrintsBuildMetadata(t *testing.T) {
+	code, stdout, stderr := runTestCLI(t, []string{"--version"}, nil)
+	if code != 0 {
+		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
+	}
+	if !strings.Contains(stdout, "pxlb ") || !strings.Contains(stdout, "commit:") || !strings.Contains(stdout, "built:") {
+		t.Fatalf("expected version output, got %q", stdout)
+	}
+}
+
+func TestHelpListsRoutesWithDescriptions(t *testing.T) {
+	code, stdout, stderr := runTestCLI(t, []string{"--help"}, nil)
+	if code != 0 {
+		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
+	}
+	for _, want := range []string{
+		"pxlb <api-route> [flags]",
+		"balance",
+		"Show account credits and subscription generation balance.",
+		"objects/<object_id> --http-method delete",
+		"Delete an object and its associated rotations, animations, and tags.",
+		"create-image-pixen",
+		"Create pixel art with the Pixen image model.",
+	} {
+		if !strings.Contains(stdout, want) {
+			t.Fatalf("expected help to contain %q, got:\n%s", want, stdout)
+		}
+	}
+}
+
+func TestAllRoutesHaveHelpDescriptions(t *testing.T) {
+	if got, want := len(helpEntries()), len(EndpointSpecs()); got != want {
+		t.Fatalf("help entry count mismatch: got %d want %d", got, want)
+	}
+	for _, spec := range EndpointSpecs() {
+		description := routeDescription(spec)
+		if description == "" || description == "Call this PixelLab API route." {
+			t.Fatalf("missing help description for %s %s", spec.Method, spec.Path)
+		}
+	}
+}
+
 func TestGetBalanceSendsAuthAndNoBody(t *testing.T) {
 	server := newAPIServer(t, func(req capturedRequest) (int, string) {
 		if req.Method != http.MethodGet || req.Path != "/balance" {
@@ -159,7 +201,7 @@ func TestGetBalanceSendsAuthAndNoBody(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, stdout, stderr := runTestCLI(t, []string{"get", "/balance", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	code, stdout, stderr := runTestCLI(t, []string{"balance", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
 	if code != 0 {
 		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
 	}
@@ -184,7 +226,7 @@ func TestPostPixenBuildsTypedJSONBody(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := runTestCLI(t, []string{
-		"post", "/create-image-pixen",
+		"create-image-pixen",
 		"--base-url", server.URL,
 		"--description", "cute dragon",
 		"--image-size", "128x64",
@@ -212,9 +254,8 @@ func TestPathParamsQueryParamsAndPatchTags(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := runTestCLI(t, []string{
-		"patch", "/objects/{object_id}/tags",
+		"objects/object-123/tags",
 		"--base-url", server.URL,
-		"--object-id", "object-123",
 		"--tag", "prop",
 		"--tag", "barrel",
 	}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
@@ -235,7 +276,86 @@ func TestListObjectsUsesQueryParams(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, _, stderr := runTestCLI(t, []string{"get", "/objects", "--base-url", server.URL, "--limit", "10", "--offset", "20"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	code, _, stderr := runTestCLI(t, []string{"objects", "--base-url", server.URL, "--limit", "10", "--offset", "20"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	if code != 0 {
+		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
+	}
+}
+
+func TestCollidingGetDeleteRouteDefaultsToSafeGet(t *testing.T) {
+	server := newAPIServer(t, func(req capturedRequest) (int, string) {
+		if req.Method != http.MethodGet || req.Path != "/objects/object-123" {
+			t.Fatalf("unexpected request: %s %s", req.Method, req.Path)
+		}
+		return http.StatusOK, `{"id":"object-123"}`
+	})
+	defer server.Close()
+
+	code, _, stderr := runTestCLI(t, []string{"objects/object-123", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	if code != 0 {
+		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
+	}
+}
+
+func TestMethodFlagSelectsDeleteForCollidingRoute(t *testing.T) {
+	server := newAPIServer(t, func(req capturedRequest) (int, string) {
+		if req.Method != http.MethodDelete || req.Path != "/objects/object-123" {
+			t.Fatalf("unexpected request: %s %s", req.Method, req.Path)
+		}
+		return http.StatusOK, `{"deleted":true}`
+	})
+	defer server.Close()
+
+	code, _, stderr := runTestCLI(t, []string{"objects/object-123", "--base-url", server.URL, "--http-method", "delete"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	if code != 0 {
+		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
+	}
+}
+
+func TestTemplatedPathParamsAreRejected(t *testing.T) {
+	server := newAPIServer(t, func(req capturedRequest) (int, string) {
+		t.Fatalf("templated route should not send request")
+		return http.StatusOK, `{}`
+	})
+	defer server.Close()
+
+	code, _, stderr := runTestCLI(t, []string{"objects/{object_id}", "--base-url", server.URL, "--object-id", "object-123"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	if code == 0 {
+		t.Fatalf("expected templated route to fail")
+	}
+	if !strings.Contains(stderr, "unknown endpoint") {
+		t.Fatalf("expected unknown endpoint error, got %q", stderr)
+	}
+}
+
+func TestDuplicatePathParamFlagIsRejected(t *testing.T) {
+	server := newAPIServer(t, func(req capturedRequest) (int, string) {
+		t.Fatalf("duplicate path parameter should not send request")
+		return http.StatusOK, `{}`
+	})
+	defer server.Close()
+
+	code, _, stderr := runTestCLI(t, []string{"objects/object-123", "--base-url", server.URL, "--object-id", "object-123"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	if code == 0 {
+		t.Fatalf("expected duplicate path parameter flag to fail")
+	}
+	if !strings.Contains(stderr, "belongs in the route") {
+		t.Fatalf("expected route parameter error, got %q", stderr)
+	}
+}
+
+func TestBodyFlagsSelectPostForCollidingRoute(t *testing.T) {
+	server := newAPIServer(t, func(req capturedRequest) (int, string) {
+		if req.Method != http.MethodPost || req.Path != "/tilesets" {
+			t.Fatalf("unexpected request: %s %s", req.Method, req.Path)
+		}
+		assertJSONValue(t, req.Body, "lower_description", "ocean")
+		assertJSONValue(t, req.Body, "upper_description", "beach")
+		return http.StatusAccepted, `{"background_job_id":"job-tileset"}`
+	})
+	defer server.Close()
+
+	code, _, stderr := runTestCLI(t, []string{"tilesets", "--base-url", server.URL, "--lower-description", "ocean", "--upper-description", "beach"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
 	if code != 0 {
 		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
 	}
@@ -258,7 +378,7 @@ func TestBodyJSONInlineAndFile(t *testing.T) {
 			})
 			defer server.Close()
 
-			code, _, stderr := runTestCLI(t, []string{"post", "/create-image-pixen", "--base-url", server.URL, "--body-json", tc.arg}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+			code, _, stderr := runTestCLI(t, []string{"create-image-pixen", "--base-url", server.URL, "--body-json", tc.arg}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
 			if code != 0 {
 				t.Fatalf("expected success, got code %d stderr %s", code, stderr)
 			}
@@ -283,7 +403,7 @@ func TestImagePathFlagsEncodeBase64ImageObjects(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := runTestCLI(t, []string{
-		"post", "/remove-background",
+		"remove-background",
 		"--base-url", server.URL,
 		"--image", imagePath,
 		"--image-size", "7x1",
@@ -306,7 +426,7 @@ func TestRepeatedImageFlagsBuildArrays(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := runTestCLI(t, []string{
-		"post", "/generate-with-style-v2",
+		"generate-with-style-v2",
 		"--base-url", server.URL,
 		"--style-image", styleA,
 		"--style-image", styleB,
@@ -342,7 +462,7 @@ func TestAsyncWaitPollsJobAndWritesImages(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := runTestCLI(t, []string{
-		"post", "/generate-image-v2",
+		"generate-image-v2",
 		"--base-url", server.URL,
 		"--description", "crystal sword",
 		"--image-size", "32x32",
@@ -390,9 +510,8 @@ func TestAsyncWaitFindsNestedSubmissionJobID(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := runTestCLI(t, []string{
-		"post", "/objects/{object_id}/animations",
+		"objects/object-1/animations",
 		"--base-url", server.URL,
-		"--object-id", "object-1",
 		"--animation-description", "slash",
 		"--wait",
 		"--poll-interval", "1ms",
@@ -416,7 +535,7 @@ func TestWaitTimeoutReturnsNonZero(t *testing.T) {
 	defer server.Close()
 
 	code, _, stderr := runTestCLI(t, []string{
-		"post", "/generate-image-v2",
+		"generate-image-v2",
 		"--base-url", server.URL,
 		"--description", "slow job",
 		"--image-size", "32x32",
@@ -438,7 +557,7 @@ func TestHTTPErrorReturnsNonZeroAndPrintsMessage(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, _, stderr := runTestCLI(t, []string{"get", "/balance", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "bad-token"})
+	code, _, stderr := runTestCLI(t, []string{"balance", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "bad-token"})
 	if code == 0 {
 		t.Fatalf("expected failure exit code")
 	}
@@ -455,7 +574,7 @@ func TestMissingRequiredFlagFailsBeforeRequest(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, _, stderr := runTestCLI(t, []string{"post", "/create-image-pixen", "--base-url", server.URL, "--image-size", "32x32"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	code, _, stderr := runTestCLI(t, []string{"create-image-pixen", "--base-url", server.URL, "--image-size", "32x32"}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
 	if code == 0 {
 		t.Fatalf("expected validation failure")
 	}
@@ -474,7 +593,7 @@ func TestUnknownEndpointFailsBeforeRequest(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, _, stderr := runTestCLI(t, []string{"get", "/not-real", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
+	code, _, stderr := runTestCLI(t, []string{"not-real", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
 	if code == 0 {
 		t.Fatalf("expected unknown endpoint failure")
 	}
@@ -492,7 +611,7 @@ func TestTokenFlagOverridesEnvironment(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, _, stderr := runTestCLI(t, []string{"get", "/balance", "--base-url", server.URL, "--token", "flag-token"}, map[string]string{"PIXELLAB_API_KEY": "env-token"})
+	code, _, stderr := runTestCLI(t, []string{"balance", "--base-url", server.URL, "--token", "flag-token"}, map[string]string{"PIXELLAB_API_KEY": "env-token"})
 	if code != 0 {
 		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
 	}
@@ -513,7 +632,7 @@ func TestDotEnvPixellabAPIKeyIsUsedWhenEnvironmentIsUnset(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, _, stderr := runTestCLI(t, []string{"get", "/balance", "--base-url", server.URL}, map[string]string{})
+	code, _, stderr := runTestCLI(t, []string{"balance", "--base-url", server.URL}, map[string]string{})
 	if code != 0 {
 		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
 	}
@@ -534,7 +653,7 @@ func TestTokenPrecedenceFlagEnvironmentThenDotEnv(t *testing.T) {
 	})
 	defer server.Close()
 
-	code, _, stderr := runTestCLI(t, []string{"get", "/balance", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "env-token"})
+	code, _, stderr := runTestCLI(t, []string{"balance", "--base-url", server.URL}, map[string]string{"PIXELLAB_API_KEY": "env-token"})
 	if code != 0 {
 		t.Fatalf("expected success, got code %d stderr %s", code, stderr)
 	}
@@ -553,9 +672,8 @@ func TestOutputFileReceivesBinaryZipResponse(t *testing.T) {
 
 	outPath := filepath.Join(t.TempDir(), "character.zip")
 	code, _, stderr := runTestCLI(t, []string{
-		"get", "/characters/{character_id}/zip",
+		"characters/char-1/zip",
 		"--base-url", server.URL,
-		"--character-id", "char-1",
 		"--out", outPath,
 	}, map[string]string{"PIXELLAB_API_KEY": "test-token"})
 	if code != 0 {
@@ -581,7 +699,7 @@ func TestDurationFlagsAreParsed(t *testing.T) {
 	defer server.Close()
 
 	code, _, _ := runTestCLI(t, []string{
-		"post", "/generate-image-v2",
+		"generate-image-v2",
 		"--base-url", server.URL,
 		"--description", "duration test",
 		"--image-size", "32x32",
