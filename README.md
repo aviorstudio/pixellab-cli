@@ -2,18 +2,64 @@
 
 `pxlb` is a thin Go CLI for the [PixelLab v2 API](https://api.pixellab.ai/v2/docs). It exposes PixelLab routes directly, keeps request fields as simple flags, supports async job polling, and can save returned images or binary downloads.
 
+## Install
+
+### Option 1: mise
+
+Add `pxlb` to your `.mise.toml` as a GitHub release tool. Pick the asset for your OS and CPU architecture.
+
+Linux x86_64 example:
+
+```toml
+[tools]
+"github:aviorstudio/pixellab-cli" = { version = "v0.0.1", asset_pattern = "pxlb_Linux_x86_64.tar.gz", bin = "pxlb" }
+```
+
+Then install and verify:
+
+```bash
+mise install
+pxlb --version
+```
+
+Common asset patterns:
+
+```text
+pxlb_Linux_x86_64.tar.gz
+pxlb_Linux_arm64.tar.gz
+pxlb_Darwin_x86_64.tar.gz
+pxlb_Darwin_arm64.tar.gz
+pxlb_Windows_x86_64.zip
+pxlb_Windows_arm64.zip
+```
+
+### Option 2: install.sh
+
+macOS and Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aviorstudio/pixellab-cli/main/install.sh | sh
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aviorstudio/pixellab-cli/main/install.sh | VERSION=0.0.1 sh
+```
+
+Install to a specific directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aviorstudio/pixellab-cli/main/install.sh | INSTALL_DIR="$HOME/.local/bin" sh
+```
+
+Windows builds are available from [GitHub Releases](https://github.com/aviorstudio/pixellab-cli/releases).
+
 ## Quick Start
 
 ```bash
-make build
-./bin/pxlb --help
-./bin/pxlb --version
-```
-
-Install to `$(go env GOPATH)/bin/pxlb`:
-
-```bash
-make install
+pxlb --help
+pxlb --version
 ```
 
 Set your API key:
