@@ -19,7 +19,7 @@ concurrency: release-${{ github.repository }}
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout
         uses: actions/checkout@v4
