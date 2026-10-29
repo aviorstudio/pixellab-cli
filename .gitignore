@@ -2,3 +2,6 @@
 tmp
 /bin
 /dist
+
+# Native runtime files generated from functional inputs.
+/SKILL.md
