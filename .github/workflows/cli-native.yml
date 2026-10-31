@@ -1,0 +1,107 @@
+name: Native CLI
+'on':
+  workflow_call:
+    inputs:
+      release:
+        type: boolean
+        default: false
+      version:
+        type: string
+        default: dev
+      date:
+        type: string
+        default: unknown
+permissions:
+  contents: read
+jobs:
+  native:
+    name: CLI ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - runner: ubuntu-24.04
+          rust-target: x86_64-unknown-linux-musl
+          platform: Linux
+          arch: x86_64
+          extension: tar.gz
+        - runner: ubuntu-24.04-arm
+          rust-target: aarch64-unknown-linux-musl
+          platform: Linux
+          arch: arm64
+          extension: tar.gz
+        - runner: macos-15-intel
+          rust-target: x86_64-apple-darwin
+          platform: Darwin
+          arch: x86_64
+          extension: tar.gz
+        - runner: macos-15
+          rust-target: aarch64-apple-darwin
+          platform: Darwin
+          arch: arm64
+          extension: tar.gz
+        - runner: windows-2025
+          rust-target: x86_64-pc-windows-msvc
+          platform: Windows
+          arch: x86_64
+          extension: zip
+        - runner: windows-11-arm
+          rust-target: aarch64-pc-windows-msvc
+          platform: Windows
+          arch: arm64
+          extension: zip
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ inputs.version }}
+      COMMIT: ${{ github.sha }}
+      DATE: ${{ inputs.date }}
+      CARGO_INCREMENTAL: '0'
+      RUST_TARGET: ${{ matrix.rust-target }}
+      CC_x86_64_unknown_linux_musl: musl-gcc
+      CC_aarch64_unknown_linux_musl: musl-gcc
+    steps:
+    - name: Check out source
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - name: Install pinned Rust
+      run: rustup toolchain install 1.94.0 --profile minimal --target "$RUST_TARGET"
+    - name: Link Windows C runtime statically
+      if: runner.os == 'Windows'
+      run: echo 'RUSTFLAGS=-C target-feature=+crt-static' >> "$GITHUB_ENV"
+    - name: Install native musl linker
+      if: runner.os == 'Linux'
+      run: |
+        set -euo pipefail
+        sudo apt-get update -qq
+        sudo apt-get install -y musl-tools
+    - name: Test native CLI
+      run: |
+        set -euo pipefail
+        cargo +1.94.0 test --locked --target "$RUST_TARGET"
+        cargo +1.94.0 build --locked --target "$RUST_TARGET"
+        binary="target/$RUST_TARGET/debug/pxlb"
+        [ "$RUNNER_OS" != Windows ] || binary+=.exe
+        PXLB_TEST_BINARY="$binary" python3 tests/cli_test.py
+    - name: Build release archive
+      if: inputs.release
+      env:
+        RELEASE_PLATFORM: ${{ matrix.platform }}
+        RELEASE_ARCH: ${{ matrix.arch }}
+        RELEASE_EXTENSION: ${{ matrix.extension }}
+      run: |
+        set -euo pipefail
+        cargo +1.94.0 build --release --locked --target "$RUST_TARGET"
+        python3 scripts/package-cli.py
+    - name: Upload native archive
+      if: inputs.release
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+      with:
+        name: native-cli-${{ matrix.platform }}-${{ matrix.arch }}
+        path: dist/pxlb_${{ matrix.platform }}_${{ matrix.arch }}.${{ matrix.extension }}
+        if-no-files-found: error
+        retention-days: 7

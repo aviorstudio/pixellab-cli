@@ -1,8 +1,8 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: d2f6ae17e92a456a2058008b4cc5cb93956affd8bb613ef89b00c0690cb8a136 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 89ecdfa6933d25b2d0e13f5e45768e69d3980aa17864287e57c0bcf7677e1506 -->
 
 # pxlb
 
-`pxlb` is a thin Go CLI for the [PixelLab v2 API](https://api.pixellab.ai/v2/docs). It exposes PixelLab routes directly, keeps request fields as simple flags, supports async job polling, and can save returned images or binary downloads.
+`pxlb` is a thin Rust CLI for the [PixelLab v2 API](https://api.pixellab.ai/v2/docs). It exposes PixelLab routes directly, keeps request fields as simple flags, supports async job polling, and can save returned images or binary downloads.
 
 ## Install
 
@@ -325,3 +325,7 @@ python3 scripts/prepare-runtime.py
 ```
 
 This creates the native discovery files from the tracked functional inputs. Run it again after pulling an update; if a generated file has local edits, preserve those edits before replacing it.
+
+## Build from source
+
+Requires Rust 1.94.0. Run `cargo build --release --locked` to build `target/release/pxlb` (`pxlb.exe` on Windows). `make build` also copies it to `bin/pxlb`; `make install` installs into Cargo’s binary directory. Run `make test` for the CLI contracts. GitHub Actions verifies all six release targets, including static Linux builds.

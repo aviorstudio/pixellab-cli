@@ -5,3 +5,8 @@ tmp
 
 # Native runtime files generated from functional inputs.
 /SKILL.md
+
+/target/
+/.artifacts/
+/.ci-tools/
+.env

@@ -120,7 +120,7 @@ curl -fsSL "$BASE_URL/$ARTIFACT" -o "$TMP_DIR/$ARTIFACT"
 curl -fsSL "$BASE_URL/checksums.txt" -o "$TMP_DIR/checksums.txt"
 verify_checksum "$TMP_DIR/$ARTIFACT" "$TMP_DIR/checksums.txt"
 
-tar -xzf "$TMP_DIR/$ARTIFACT" -C "$TMP_DIR" pxlb
+tar --no-same-owner -xzf "$TMP_DIR/$ARTIFACT" -C "$TMP_DIR" pxlb
 
 DEST_DIR="$(pick_install_dir)"
 mkdir -p "$DEST_DIR"
