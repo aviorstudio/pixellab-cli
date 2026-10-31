@@ -10,6 +10,7 @@ import stat
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 from urllib.parse import parse_qs, urlsplit
 
@@ -18,7 +19,7 @@ OPERATIONS=json.loads((Path(__file__).parent/'operations.json').read_text())
 
 
 @contextmanager
-def api(responder=None):
+def api(responder=None, body_delay=0):
     calls=[]
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*_args):
@@ -33,7 +34,11 @@ def api(responder=None):
             self.send_header('Content-Type',media)
             self.send_header('Content-Length',str(len(data)))
             self.end_headers()
-            self.wfile.write(data)
+            time.sleep(body_delay)
+            try:
+                self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass  # A timed-out client is expected to close this connection.
         do_GET=respond
         do_POST=respond
         do_PATCH=respond
@@ -150,6 +155,12 @@ class CLI(unittest.TestCase):
             result=self.request(url,'balance')
             self.assertEqual(result.returncode,1)
             self.assertIn('API error 500: fixture failed',result.stderr)
+    def test_timeout_after_response_headers_is_identified(self):
+        with api(lambda calls:(200,dict(job_id='job-1') if len(calls)==1 else dict(status='processing'),'application/json'), body_delay=.5) as (url,calls):
+            result=self.request(url,'generate-image-v2','--body-json','{}','--wait','--timeout','100ms')
+            self.assertNotEqual(result.returncode,0)
+            self.assertIn('timeout',result.stderr)
+            self.assertEqual(len(calls),2)
     def test_token_precedence_flag_environment_then_dotenv(self):
         (self.root/'.env').write_text('export PIXELLAB_API_KEY="file-token"\n')
         with api() as (url,calls):

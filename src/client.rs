@@ -75,6 +75,7 @@ pub fn execute(
     if let Some(remaining) = remaining {
         request = request.timeout(remaining);
     }
+    let started = Instant::now();
     let mut response = match request.send() {
         Ok(response) => response,
         Err(error) if error.is_timeout() => return Err("request timeout".into()),
@@ -88,7 +89,21 @@ pub fn execute(
         .unwrap_or("")
         .to_owned();
     let mut bytes = Vec::new();
-    std::io::Read::take(&mut response, (512 << 20) + 1).read_to_end(&mut bytes)?;
+    if let Err(error) = std::io::Read::take(&mut response, (512 << 20) + 1).read_to_end(&mut bytes)
+    {
+        // The blocking response wraps body timeouts in io::Error; unlike send(),
+        // its Display text does not reliably include the underlying timeout.
+        if error.kind() == std::io::ErrorKind::TimedOut
+            || error
+                .get_ref()
+                .and_then(|source| source.downcast_ref::<reqwest::Error>())
+                .is_some_and(reqwest::Error::is_timeout)
+            || remaining.is_some_and(|budget| started.elapsed() >= budget)
+        {
+            return Err("request timeout".into());
+        }
+        return Err(error.into());
+    }
     if bytes.len() > 512 << 20 {
         return Err("API response exceeds 512 MiB".into());
     }
