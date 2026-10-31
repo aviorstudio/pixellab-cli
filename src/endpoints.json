@@ -1,0 +1,602 @@
+[
+  {
+    "method": "DELETE",
+    "path": "/characters/{character_id}",
+    "required": [],
+    "query": [],
+    "description": "Delete a character and its associated data."
+  },
+  {
+    "method": "DELETE",
+    "path": "/objects/{object_id}",
+    "required": [],
+    "query": [],
+    "description": "Delete an object and its associated rotations, animations, and tags."
+  },
+  {
+    "method": "GET",
+    "path": "/background-jobs/{job_id}",
+    "required": [],
+    "query": [],
+    "description": "Check the status and result of an asynchronous background job."
+  },
+  {
+    "method": "GET",
+    "path": "/balance",
+    "required": [],
+    "query": [],
+    "description": "Show account credits and subscription generation balance."
+  },
+  {
+    "method": "GET",
+    "path": "/characters",
+    "required": [],
+    "query": [
+      "limit",
+      "offset"
+    ],
+    "description": "List characters with pagination."
+  },
+  {
+    "method": "GET",
+    "path": "/characters/{character_id}",
+    "required": [],
+    "query": [],
+    "description": "Show character details, rotations, animations, and download links."
+  },
+  {
+    "method": "GET",
+    "path": "/characters/{character_id}/zip",
+    "required": [],
+    "query": [],
+    "description": "Download a character ZIP archive."
+  },
+  {
+    "method": "GET",
+    "path": "/isometric-tiles",
+    "required": [],
+    "query": [
+      "limit",
+      "offset"
+    ],
+    "description": "List generated isometric tiles."
+  },
+  {
+    "method": "GET",
+    "path": "/isometric-tiles/{tile_id}",
+    "required": [],
+    "query": [],
+    "description": "Show an isometric tile or its generation status."
+  },
+  {
+    "method": "GET",
+    "path": "/llms.txt",
+    "required": [],
+    "query": [],
+    "description": "Print PixelLab's LLM-oriented API documentation."
+  },
+  {
+    "method": "GET",
+    "path": "/objects",
+    "required": [],
+    "query": [
+      "limit",
+      "offset"
+    ],
+    "description": "List objects with pagination."
+  },
+  {
+    "method": "GET",
+    "path": "/objects/{object_id}",
+    "required": [],
+    "query": [],
+    "description": "Show object details, rotations, animations, and download links."
+  },
+  {
+    "method": "GET",
+    "path": "/tiles-pro/{tile_id}",
+    "required": [],
+    "query": [],
+    "description": "Show generated pro tile data and storage URLs."
+  },
+  {
+    "method": "GET",
+    "path": "/tilesets",
+    "required": [],
+    "query": [
+      "limit",
+      "offset"
+    ],
+    "description": "List generated top-down tilesets."
+  },
+  {
+    "method": "GET",
+    "path": "/tilesets/{tileset_id}",
+    "required": [],
+    "query": [],
+    "description": "Show a tileset, download links, and generation status."
+  },
+  {
+    "method": "PATCH",
+    "path": "/characters/{character_id}/tags",
+    "required": [
+      "tags"
+    ],
+    "query": [],
+    "description": "Replace a character's tags."
+  },
+  {
+    "method": "PATCH",
+    "path": "/objects/{object_id}/tags",
+    "required": [
+      "tags"
+    ],
+    "query": [],
+    "description": "Replace an object's tags."
+  },
+  {
+    "method": "POST",
+    "path": "/animate-character",
+    "required": [
+      "character_id"
+    ],
+    "query": [],
+    "description": "Queue a character animation from a template or text description."
+  },
+  {
+    "method": "POST",
+    "path": "/animate-with-skeleton",
+    "required": [
+      "image_size",
+      "reference_image"
+    ],
+    "query": [],
+    "description": "Generate animation frames from a reference image and skeleton keypoints."
+  },
+  {
+    "method": "POST",
+    "path": "/animate-with-text",
+    "required": [
+      "image_size",
+      "description",
+      "action",
+      "reference_image"
+    ],
+    "query": [],
+    "description": "Generate legacy text-guided animation frames from a reference image."
+  },
+  {
+    "method": "POST",
+    "path": "/animate-with-text-v2",
+    "required": [
+      "reference_image",
+      "reference_image_size",
+      "action",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Queue pro text-guided animation from a reference image."
+  },
+  {
+    "method": "POST",
+    "path": "/animate-with-text-v3",
+    "required": [
+      "first_frame",
+      "action"
+    ],
+    "query": [],
+    "description": "Generate v3 text-guided animation from first and optional last frames."
+  },
+  {
+    "method": "POST",
+    "path": "/characters/animations",
+    "required": [
+      "character_id"
+    ],
+    "query": [],
+    "description": "Queue a character animation using the character animation API."
+  },
+  {
+    "method": "POST",
+    "path": "/create-1-direction-object",
+    "required": [
+      "description"
+    ],
+    "query": [],
+    "description": "Create one-direction pixel art objects, optionally as review candidates."
+  },
+  {
+    "method": "POST",
+    "path": "/create-8-direction-object",
+    "required": [
+      "description"
+    ],
+    "query": [],
+    "description": "Create an object rendered from eight directions."
+  },
+  {
+    "method": "POST",
+    "path": "/create-character-pro",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Create a pro-mode character."
+  },
+  {
+    "method": "POST",
+    "path": "/create-character-state",
+    "required": [
+      "character_id",
+      "edit_description"
+    ],
+    "query": [],
+    "description": "Create an edited state of an existing character."
+  },
+  {
+    "method": "POST",
+    "path": "/create-character-v3",
+    "required": [
+      "description"
+    ],
+    "query": [],
+    "description": "Create a v3 character."
+  },
+  {
+    "method": "POST",
+    "path": "/create-character-with-4-directions",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Create a four-direction character."
+  },
+  {
+    "method": "POST",
+    "path": "/create-character-with-8-directions",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Create an eight-direction character."
+  },
+  {
+    "method": "POST",
+    "path": "/create-image-bitforge",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Create pixel art with the Bitforge image model."
+  },
+  {
+    "method": "POST",
+    "path": "/create-image-pixen",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Create pixel art with the Pixen image model."
+  },
+  {
+    "method": "POST",
+    "path": "/create-image-pixflux",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Create pixel art with the Pixflux image model."
+  },
+  {
+    "method": "POST",
+    "path": "/create-isometric-tile",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Create an isometric pixel art tile."
+  },
+  {
+    "method": "POST",
+    "path": "/create-tiles-pro",
+    "required": [
+      "description"
+    ],
+    "query": [],
+    "description": "Create multiple pro tile variations."
+  },
+  {
+    "method": "POST",
+    "path": "/create-tileset",
+    "required": [
+      "lower_description",
+      "upper_description"
+    ],
+    "query": [],
+    "description": "Create a top-down Wang tileset with terrain transitions."
+  },
+  {
+    "method": "POST",
+    "path": "/create-tileset-sidescroller",
+    "required": [
+      "lower_description"
+    ],
+    "query": [],
+    "description": "Create a sidescroller platformer tileset."
+  },
+  {
+    "method": "POST",
+    "path": "/edit-animation-v2",
+    "required": [
+      "description",
+      "frames",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Edit existing animation frames with a text instruction."
+  },
+  {
+    "method": "POST",
+    "path": "/edit-image",
+    "required": [
+      "image",
+      "image_size",
+      "description",
+      "width",
+      "height"
+    ],
+    "query": [],
+    "description": "Edit a single image with text guidance."
+  },
+  {
+    "method": "POST",
+    "path": "/edit-images-v2",
+    "required": [
+      "edit_images",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Edit multiple images with text guidance."
+  },
+  {
+    "method": "POST",
+    "path": "/enhance-animation-v3-prompt",
+    "required": [
+      "first_frame",
+      "action"
+    ],
+    "query": [],
+    "description": "Enhance an animation action prompt for v3 generation."
+  },
+  {
+    "method": "POST",
+    "path": "/enhance-character-v3-prompt",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Enhance a character creation prompt."
+  },
+  {
+    "method": "POST",
+    "path": "/enhance-pixen-prompt",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Enhance an image generation prompt."
+  },
+  {
+    "method": "POST",
+    "path": "/estimate-skeleton",
+    "required": [],
+    "query": [],
+    "description": "Estimate skeleton keypoints from an image."
+  },
+  {
+    "method": "POST",
+    "path": "/generate-8-rotations-v2",
+    "required": [
+      "image_size"
+    ],
+    "query": [],
+    "description": "Queue pro generation of eight rotations for an image."
+  },
+  {
+    "method": "POST",
+    "path": "/generate-8-rotations-v3",
+    "required": [
+      "first_frame"
+    ],
+    "query": [],
+    "description": "Generate eight rotations from a first frame."
+  },
+  {
+    "method": "POST",
+    "path": "/generate-image-v2",
+    "required": [
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Queue pro image generation."
+  },
+  {
+    "method": "POST",
+    "path": "/generate-ui-v2",
+    "required": [
+      "description"
+    ],
+    "query": [],
+    "description": "Queue UI asset generation."
+  },
+  {
+    "method": "POST",
+    "path": "/generate-with-style-v2",
+    "required": [
+      "style_images",
+      "description",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Queue image generation matching style reference images."
+  },
+  {
+    "method": "POST",
+    "path": "/image-to-pixelart",
+    "required": [
+      "image",
+      "image_size",
+      "output_size"
+    ],
+    "query": [],
+    "description": "Convert an image to pixel art."
+  },
+  {
+    "method": "POST",
+    "path": "/inpaint",
+    "required": [
+      "description",
+      "image_size",
+      "inpainting_image",
+      "mask_image"
+    ],
+    "query": [],
+    "description": "Inpaint an image region using a mask."
+  },
+  {
+    "method": "POST",
+    "path": "/inpaint-v3",
+    "required": [
+      "description",
+      "inpainting_image",
+      "mask_image"
+    ],
+    "query": [],
+    "description": "Inpaint an image region with the v3 inpainting model."
+  },
+  {
+    "method": "POST",
+    "path": "/interpolation-v2",
+    "required": [
+      "start_image",
+      "end_image",
+      "action",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Interpolate animation frames between start and end images."
+  },
+  {
+    "method": "POST",
+    "path": "/map-objects",
+    "required": [
+      "description"
+    ],
+    "query": [],
+    "description": "Create a map object, optionally style-matched to a background."
+  },
+  {
+    "method": "POST",
+    "path": "/objects/{object_id}/animations",
+    "required": [],
+    "query": [],
+    "description": "Queue an animation for an existing object."
+  },
+  {
+    "method": "POST",
+    "path": "/objects/{object_id}/dismiss-review",
+    "required": [],
+    "query": [],
+    "description": "Discard all review candidates for an object."
+  },
+  {
+    "method": "POST",
+    "path": "/objects/{object_id}/select-frames",
+    "required": [
+      "indices"
+    ],
+    "query": [],
+    "description": "Promote selected review candidates into completed objects."
+  },
+  {
+    "method": "POST",
+    "path": "/objects/{object_id}/states",
+    "required": [
+      "edit_description"
+    ],
+    "query": [],
+    "description": "Create an edited state of an existing object."
+  },
+  {
+    "method": "POST",
+    "path": "/remove-background",
+    "required": [
+      "image",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Remove the background from an image."
+  },
+  {
+    "method": "POST",
+    "path": "/resize",
+    "required": [
+      "description",
+      "reference_image",
+      "reference_image_size",
+      "target_size"
+    ],
+    "query": [],
+    "description": "Resize and regenerate an image to a target size."
+  },
+  {
+    "method": "POST",
+    "path": "/rotate",
+    "required": [
+      "image_size",
+      "from_image"
+    ],
+    "query": [],
+    "description": "Rotate an image from one direction to another."
+  },
+  {
+    "method": "POST",
+    "path": "/tilesets",
+    "required": [
+      "lower_description",
+      "upper_description"
+    ],
+    "query": [],
+    "description": "Create a top-down Wang tileset with terrain transitions."
+  },
+  {
+    "method": "POST",
+    "path": "/tilesets-sidescroller",
+    "required": [
+      "lower_description"
+    ],
+    "query": [],
+    "description": "Create a sidescroller platformer tileset."
+  },
+  {
+    "method": "POST",
+    "path": "/transfer-outfit-v2",
+    "required": [
+      "reference_image",
+      "frames",
+      "image_size"
+    ],
+    "query": [],
+    "description": "Transfer outfit or appearance from a reference onto frames."
+  }
+]

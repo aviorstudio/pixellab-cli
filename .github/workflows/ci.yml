@@ -1,25 +1,32 @@
 name: CI
-
-on:
+'on':
   pull_request:
   push:
-    branches:
-      - main
-
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  cli:
+  native-cli:
+    name: Native CLI
+    uses: ./.github/workflows/cli-native.yml
+    permissions:
+      contents: read
+  quality:
+    name: Rust formatting and lint
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Test CLI
-        run: go test ./...
-
-      - name: Build CLI
-        run: make build
+    - name: Check out source
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        persist-credentials: false
+    - name: Install pinned Rust
+      run: rustup toolchain install 1.94.0 --profile minimal --component rustfmt --component clippy
+    - name: Check source
+      run: |
+        set -euo pipefail
+        cargo +1.94.0 fmt --check
+        cargo +1.94.0 clippy --locked --all-targets -- -D warnings
