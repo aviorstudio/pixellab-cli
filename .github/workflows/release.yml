@@ -107,11 +107,11 @@ jobs:
   publish:
     name: Publish verified archives
     needs: [identity, accept-cli]
-    uses: nicodes/tools/.github/workflows/cli-publish.yml@9590742a455154ac5967a67952c5758d79d476b9
+    uses: nicodes/tools/.github/workflows/cli-publish.yml@f412061a7a3f0914db9e09d1159e69504aee8706
     permissions:
       contents: write
     with:
-      tools-ref: 9590742a455154ac5967a67952c5758d79d476b9
+      tools-ref: f412061a7a3f0914db9e09d1159e69504aee8706
       binary: pxlb
       tag: ${{ needs.identity.outputs.tag }}
       artifact-id: ${{ needs.accept-cli.outputs.artifact-id }}
