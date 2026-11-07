@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Materialize native runtime filenames from tracked functional inputs."""
-import json
+import tomllib
 from pathlib import Path
 import os
 import sys
@@ -8,7 +8,13 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 
 def prepare():
-    records = json.loads((ROOT / '.github/runtime-sources.json').read_text())
+    manifest = ROOT / '.github/runtime-sources.toml'
+    if manifest.is_symlink() or not manifest.is_file() or manifest.stat().st_size > 262144:
+        raise ValueError('runtime manifest must be a bounded regular TOML source')
+    declaration = tomllib.loads(manifest.read_text(encoding='utf-8'))
+    if set(declaration) != {'sources'} or not isinstance(declaration['sources'], list) or len(declaration['sources']) > 128:
+        raise ValueError('runtime manifest requires one bounded sources array')
+    records = declaration['sources']
     for row in records:
         source, target = ROOT / row['source'], ROOT / row['target']
         if not source.resolve().is_relative_to(ROOT.resolve()) or not target.parent.resolve().is_relative_to(ROOT.resolve()):
