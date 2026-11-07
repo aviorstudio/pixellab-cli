@@ -1,0 +1,3 @@
+[[sources]]
+source = "SKILL.prompt"
+target = "SKILL.md"

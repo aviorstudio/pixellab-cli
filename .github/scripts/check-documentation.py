@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Check tracked documentation layout and the reviewed usage README digest."""
 import hashlib
-import json
 import os
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
+import tomllib
 
 MARKDOWN = {'.md', '.markdown', '.mdown', '.mkd', '.mkdn', '.mdwn', '.mdx', '.rmd', '.qmd'}
 OTHER_DOCS = {'.rst', '.adoc', '.asciidoc'}
@@ -39,10 +39,10 @@ def check(root, include_history=True, history_required=False):
                 body = readme.read_bytes()
                 if not any(line.startswith('# ') for line in body.decode('utf-8').splitlines()):
                     errors.append('root README.md needs a product heading')
-                policy_path = root / '.github/readme-source.json'
+                policy_path = root / '.github/readme-source.toml'
                 if policy_path.is_symlink():
                     raise ValueError('README source policy cannot be a symlink')
-                policy = json.loads(policy_path.read_text())
+                policy = tomllib.loads(policy_path.read_text())
                 if policy.get('version') != 1:
                     raise ValueError('unsupported README source policy')
                 if hashlib.sha256(body).hexdigest() != policy.get('sha256'):
