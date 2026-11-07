@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 89ecdfa6933d25b2d0e13f5e45768e69d3980aa17864287e57c0bcf7677e1506 -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 6e721770cc84307b99637887871aa189f05040f2d2ef027401669233aa94b63f -->
 
 # pxlb
 
@@ -328,4 +328,6 @@ This creates the native discovery files from the tracked functional inputs. Run 
 
 ## Build from source
 
-Requires Rust 1.94.0. Run `cargo build --release --locked` to build `target/release/pxlb` (`pxlb.exe` on Windows). `make build` also copies it to `bin/pxlb`; `make install` installs into Cargo’s binary directory. Run `make test` for the CLI contracts. GitHub Actions verifies all six release targets, including static Linux builds.
+Contributor setup requires Mise and host Python 3.11 or newer on Unix, or Python 3.13 or newer on Windows, before `mise run setup`. This Python requirement applies to source development; released `pxlb` binaries run independently.
+
+Requires Rust 1.94.0. Run `mise run setup` once to prepare the declared Rust tools, locked dependencies and shared SDK source before build or tests. Run `cargo build --release --locked` to build `target/release/pxlb` (`pxlb.exe` on Windows). `mise run build` also copies it to `bin/pxlb`; `mise run install` installs into Cargo’s binary directory. Run `mise run test` for the CLI contracts. GitHub Actions verifies all six release targets, including static Linux builds.
