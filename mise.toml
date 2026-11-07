@@ -1,0 +1,38 @@
+[tools]
+go = "1.24"
+rust = "1.94.0"
+
+[env]
+MISE_AUTO_INSTALL = "false"
+MISE_EXEC_AUTO_INSTALL = "false"
+MISE_TASK_RUN_AUTO_INSTALL = "false"
+
+[settings]
+task.run_auto_install = false
+
+[vars]
+tools_contract = 1
+tools_ref = "ce590e1bed6395c627d351e7d5246cf0c82e7bd6"
+
+[tasks."setup"]
+run = [{"task" = "_sdk", "args" = ["setup"]}, "mise install rust", {"task" = "_sdk", "args" = ["exec", "helpers/pinned-tools.py", "exec", "--tool", "rust=cargo", "--tool", "rust=rustc", "--", "cargo", "fetch", "--locked"]}]
+raw = true
+
+[tasks."build"]
+run = [{"task" = "_sdk", "args" = ["exec", "helpers/pinned-tools.py", "exec", "--tool", "rust=cargo", "--tool", "rust=rustc", "--", "bash", "-euc", "export VERSION=\"${VERSION-dev}\"\nexport COMMIT=\"${COMMIT-$(git rev-parse HEAD 2>/dev/null || printf none)}\"\nexport DATE=\"${DATE-$(date -u +%Y-%m-%dT%H:%M:%SZ)}\"\nexport CARGO_NET_OFFLINE=true\ncargo build --release --locked\nmkdir -p bin\ncp \"${CARGO_TARGET_DIR:-target}/release/pxlb\" bin/pxlb"]}]
+raw = true
+
+[tasks."install"]
+description = "Perform the original explicitly requested Cargo installation"
+run = [{"task" = "_sdk", "args" = ["exec", "helpers/pinned-tools.py", "exec", "--tool", "rust=cargo", "--tool", "rust=rustc", "--", "bash", "-euc", "export VERSION=\"${VERSION-dev}\"\nexport COMMIT=\"${COMMIT-$(git rev-parse HEAD 2>/dev/null || printf none)}\"\nexport DATE=\"${DATE-$(date -u +%Y-%m-%dT%H:%M:%SZ)}\"\ncargo install --path . --locked"]}]
+raw = true
+
+[tasks."test"]
+run = [{"task" = "_sdk", "args" = ["exec", "helpers/pinned-tools.py", "exec", "--tool", "rust=cargo", "--tool", "rust=rustc", "--", "bash", "-euc", "export VERSION=\"${VERSION-dev}\"\nexport COMMIT=\"${COMMIT-$(git rev-parse HEAD 2>/dev/null || printf none)}\"\nexport DATE=\"${DATE-$(date -u +%Y-%m-%dT%H:%M:%SZ)}\"\nexport CARGO_NET_OFFLINE=true\ncargo test --locked\ncargo build --locked\npython3 tests/cli_test.py"]}]
+raw = true
+
+[tasks."_sdk"]
+run = "exec python3 -I -B -c 'import base64,hashlib,sys,zlib;_sdk_decoder=zlib.decompressobj();_sdk_seed=_sdk_decoder.decompress(base64.b64decode(\"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\",validate=True),10603);(_sdk_decoder.eof and not _sdk_decoder.unused_data and not _sdk_decoder.unconsumed_tail and len(_sdk_seed)==10602 and hashlib.sha256(_sdk_seed).hexdigest()==\"9d75655b5ba40f74b3503f739d5d112887705667fb96a32224351e73ece93a31\") or sys.exit(\"SDK bootstrap seed failed integrity validation\");exec(compile(_sdk_seed,\"<immutable SDK bootstrap>\",\"exec\"))' ce590e1bed6395c627d351e7d5246cf0c82e7bd6 host"
+hide = true
+shell = "bash -euc"
+raw = true
