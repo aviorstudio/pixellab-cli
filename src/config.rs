@@ -1,6 +1,6 @@
 use crate::Result;
 use serde::Deserialize;
-use std::{collections::BTreeMap, fs, time::Duration};
+use std::{collections::BTreeMap, time::Duration};
 
 #[derive(Clone, Deserialize)]
 pub struct Endpoint {
@@ -74,28 +74,7 @@ fn duration(value: &str) -> Result<Duration> {
     })
 }
 pub fn token() -> String {
-    if let Ok(token) = std::env::var("PIXELLAB_API_KEY")
-        && !token.is_empty()
-    {
-        return token;
-    }
-    let Ok(text) = fs::read_to_string(".env") else {
-        return String::new();
-    };
-    let mut token = String::new();
-    for line in text.lines() {
-        let line = line.trim();
-        if line.starts_with('#') {
-            continue;
-        }
-        let line = line.strip_prefix("export ").unwrap_or(line);
-        if let Some((key, value)) = line.split_once('=')
-            && key.trim() == "PIXELLAB_API_KEY"
-        {
-            token = value.trim().trim_matches(['\"', '\'']).into();
-        }
-    }
-    token
+    std::env::var("PIXELLAB_API_KEY").unwrap_or_default()
 }
 impl Config {
     pub fn parse(args: &[String]) -> Result<Self> {
@@ -247,7 +226,7 @@ pub fn display(path: &str) -> String {
         .join("/")
 }
 pub fn help() -> String {
-    let mut text="pxlb - PixelLab v2 API CLI\n\nUsage:\n  pxlb <api-route> [flags]\n  pxlb --version\n\nGlobal flags:\n  --token <key>            PixelLab API key; overrides PIXELLAB_API_KEY and .env.\n  --base-url <url>         API base URL; defaults to https://api.pixellab.ai/v2.\n  --http-method <method>   Override inferred HTTP method for colliding routes.\n  --body-json <json|file>  Send a raw JSON request body.\n  --wait                   Poll returned background jobs until completion.\n  --poll-interval <time>   Job polling interval, default 5s.\n  --timeout <time>         Optional job polling timeout.\n  --out <path>             Save returned binary or base64 image outputs.\n  --quiet                  Suppress normal JSON output.\n\nRoutes:\n".to_owned();
+    let mut text="pxlb - PixelLab v2 API CLI\n\nUsage:\n  pxlb <api-route> [flags]\n  pxlb --version\n\nGlobal flags:\n  --token <key>            PixelLab API key; overrides PIXELLAB_API_KEY.\n  --base-url <url>         API base URL; defaults to https://api.pixellab.ai/v2.\n  --http-method <method>   Override inferred HTTP method for colliding routes.\n  --body-json <json|file>  Send a raw JSON request body.\n  --wait                   Poll returned background jobs until completion.\n  --poll-interval <time>   Job polling interval, default 5s.\n  --timeout <time>         Optional job polling timeout.\n  --out <path>             Save returned binary or base64 image outputs.\n  --quiet                  Suppress normal JSON output.\n\nRoutes:\n".to_owned();
     let mut entries: Vec<_> = endpoints()
         .into_iter()
         .map(|spec| {
