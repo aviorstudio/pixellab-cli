@@ -1,4 +1,4 @@
-<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 6e721770cc84307b99637887871aa189f05040f2d2ef027401669233aa94b63f -->
+<!-- Generated from private documentation source. Do not edit directly. Source SHA256: 1d83b6adbe2331ad365f614932124446c2e38210640df6e6f93f5c7b715cd572 -->
 
 # pxlb
 
@@ -71,7 +71,7 @@ export PIXELLAB_API_KEY="..."
 pxlb balance
 ```
 
-You can also put `PIXELLAB_API_KEY=...` in a `.env` file in the directory where you run `pxlb`, or pass `--token <key>` for a single command.
+Supply `PIXELLAB_API_KEY` through your process environment, including an approved Preview credential injected by `ghenv dev -- pxlb balance`. Keep public development defaults in Mise. Pass `--token <key>` to override the process value for a single command.
 
 ## Command Model
 
@@ -125,7 +125,7 @@ pxlb --version
 
 | Flag | Purpose |
 |---|---|
-| `--token <key>` | PixelLab API key. Overrides `PIXELLAB_API_KEY` and `.env`. |
+| `--token <key>` | PixelLab API key. Overrides `PIXELLAB_API_KEY`. |
 | `--base-url <url>` | API base URL. Defaults to `https://api.pixellab.ai/v2`. |
 | `--http-method <method>` | Override inferred method for colliding routes. Usually only needed for delete. |
 | `--json` | Print raw JSON response. |
