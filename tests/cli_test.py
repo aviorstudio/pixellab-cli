@@ -165,8 +165,8 @@ class CLI(unittest.TestCase):
         (self.root/'.env').write_text('export PIXELLAB_API_KEY="file-token"\n')
         with api() as (url,calls):
             result=self.request(url,'balance',PIXELLAB_API_KEY='')
-            self.assertNotEqual(result.returncode,0)
-            self.assertEqual(calls,[])
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertIsNone(calls[-1]['auth'])
             self.assertNotIn('file-token',result.stdout+result.stderr)
             for flags,env,expected in [([],dict(PIXELLAB_API_KEY='env-token'),'env-token'),(['--token','flag-token'],dict(PIXELLAB_API_KEY='env-token'),'flag-token')]:
                 result=self.request(url,'balance',*flags,**env)
